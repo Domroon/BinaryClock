@@ -42,7 +42,7 @@ void showStartAnimation(){
 }
 
 void initTime(char* hour, char* minute, char* second){
-    *hour = 23;
+    *hour = 0;
     *minute = 59;
     *second = 58;
 }
@@ -71,6 +71,16 @@ void countMinutes(char* minute, char* second){
     }
 }
 
+void countHours(char* hour, char* minute, char* second){
+    if(*minute == 0 && *second == 0){
+        if(*hour < 23){
+            *hour = *hour + 1;
+        } else {
+            *hour = 0;
+        }
+    }
+}
+
 int main() {
     DDRB = ALL_OUTPUT;          // set whole PORTB as output
     DDRC = ALL_OUTPUT;          // set whole PORTC as output
@@ -85,7 +95,7 @@ int main() {
         showTime(&hour, &minute, &second);
         countSeconds(&second);
         countMinutes(&minute, &second);
-        countHours(&hour, &minute);
+        countHours(&hour, &minute, &second);
         _delay_ms(1000);
     }
 }
