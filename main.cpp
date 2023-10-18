@@ -42,15 +42,23 @@ void showStartAnimation(){
 }
 
 void initTime(char* hour, char* minute, char* second){
-    *hour = 1;
-    *minute = 1;
-    *second = 1;
+    *hour = 0;
+    *minute = 0;
+    *second = 0;
 }
 
 void showTime(char* hour, char* minute, char* second){
     PORTB = *hour;
     PORTC = *minute;
     PORTD = *second;
+}
+
+void countSeconds(char* second){
+    if(*second < 59){
+        *second = *second + 1;
+    } else {
+        *second = 0;
+    }
 }
 
 int main() {
@@ -62,4 +70,10 @@ int main() {
     char second;                // PORTD display the seconds
     initTime(&hour, &minute, &second);
     showStartAnimation();
+
+    while(1){
+        showTime(&hour, &minute, &second);
+        countSeconds(&second);
+        _delay_ms(1000);
+    }
 }
