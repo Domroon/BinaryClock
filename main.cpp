@@ -5,6 +5,12 @@
 
 #define ALL_OUTPUT 0xFF
 
+enum Selected {
+    HOUR,
+    MINUTE,
+    SECOND
+};
+
 void turnOnAll(){
     PORTB = 0xFF;
     PORTC = 0xFF;
@@ -26,9 +32,9 @@ void showStartAnimation(){
     _delay_ms(200);
     turnOffAll();
     for(uint8_t i=0; i<=5; i++){
-        PORTD ^= (1 << i);
+        PORTB ^= (1 << i);
         _delay_ms(100);
-        PORTD ^= (1 << i);
+        PORTB ^= (1 << i);
     }
     for(uint8_t i=0; i<=5; i++){
         PORTC ^= (1 << i);
@@ -36,22 +42,17 @@ void showStartAnimation(){
         PORTC ^= (1 << i);
     }
     for(uint8_t i=0; i<=4; i++){
-        PORTB ^= (1 << i);
+        PORTD ^= (1 << i+3);        // +3 because LED0 is not at PD0, but at PD3
         _delay_ms(100);
-        PORTB ^= (1 << i);
+        PORTD ^= (1 << i+3);
     }
-}
-
-void initTime(uint8_t* hour, uint8_t* minute, uint8_t* second){
-    *hour = 0;
-    *minute = 59;
-    *second = 58;
+    
 }
 
 void showTime(uint8_t* hour, uint8_t* minute, uint8_t* second){
-    PORTB = *hour;
+    PORTB = *second;
     PORTC = *minute;
-    PORTD = *second;
+    PORTD = (*hour << 3);
 }
 
 void countSeconds(uint8_t* second){
@@ -82,21 +83,47 @@ void countHours(uint8_t* hour, uint8_t* minute, uint8_t* second){
     }
 }
 
-int main() {
+void initOutputs(){
     DDRB = ALL_OUTPUT;          // set whole PORTB as output
     DDRC = ALL_OUTPUT;          // set whole PORTC as output
     DDRD = ALL_OUTPUT;          // set whole PORTD as output
-    uint8_t hour;                  // PORTB displays the hours
-    uint8_t minute;                // PORTC displays the minutes
-    uint8_t second;                // PORTD display the seconds
-    initTime(&hour, &minute, &second);
+}
+
+void showConfigMode(){
+
+}
+
+int main() {
+    uint8_t hour = 16;           // PORTD displays the hours
+    uint8_t minute = 0;         // PORTC displays the minutes
+    uint8_t second = 0;         // PORTB display the seconds
+
+    bool configMode = false;
+    
+    enum Selected selected = HOUR;
+
+    initOutputs();
     showStartAnimation();
 
-    while(1){
-        showTime(&hour, &minute, &second);
-        countSeconds(&second);
-        countMinutes(&minute, &second);
-        countHours(&hour, &minute, &second);
-        _delay_ms(1000);
+    while(1) {
+        while(configMode){
+            turnOffAll();
+            switch(selected){
+                case HOUR:
+                    break;
+                case MINUTE:
+                    break;
+                case SECOND:
+                    break;
+            }
+        }
+
+        while(!configMode){
+            showTime(&hour, &minute, &second);
+            countSeconds(&second);
+            countMinutes(&minute, &second);
+            countHours(&hour, &minute, &second);
+            _delay_ms(1000);
+        }
     }
 }
