@@ -5,6 +5,8 @@
 
 #define ALL_OUTPUT 0xFF
 
+bool configMode = false;
+
 enum Selected {
     HOUR,
     MINUTE,
@@ -89,20 +91,33 @@ void initOutputs(){
     DDRD = ALL_OUTPUT;          // set whole PORTD as output
 }
 
-void showConfigMode(){
+void initINT0() {
+    EICRA = 3;                  // rising edge of INT0 generates an interrupt request
+    EIMSK = 1;                  // INT0: External Interrupt Request 0 Enable
+    SREG = 128;                 // enable interrupts globally
+    _delay_ms(200);
+}
 
+void initInputPins() {
+    DDRD &= ~(1<<0);            // set PD0 as Input
+    DDRD &= ~(1<<1);            // set PD1 as Input
+}
+
+ISR(INT0_vect){
+    //turnOffAll();
+    configMode = !configMode;
 }
 
 int main() {
-    uint8_t hour = 16;           // PORTD displays the hours
+    uint8_t hour = 0;          // PORTD displays the hours
     uint8_t minute = 0;         // PORTC displays the minutes
     uint8_t second = 0;         // PORTB display the seconds
-
-    bool configMode = false;
     
     enum Selected selected = HOUR;
 
     initOutputs();
+    initINT0();
+    initInputPins();
     showStartAnimation();
 
     while(1) {
