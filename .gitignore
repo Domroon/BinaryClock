@@ -1,3 +1,6 @@
 avr
 main.elf
 main.hex
+shiftregister.cpp
+shiftregister.elf
+shiftregister.hex
