@@ -1,9 +1,12 @@
 #include <stdint.h>
+#include <stdio.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
 
 #define ALL_OUTPUT 0xFF
+#define INPUT 0
+#define OUTPUT 1
 
 bool configMode = false;
 
@@ -11,6 +14,49 @@ enum Selected {
     HOUR,
     MINUTE,
     SECOND
+};
+
+
+class Pin {
+    private:
+        volatile uint8_t* _port;
+        volatile uint8_t* _dport;
+        uint8_t _portNumber;
+        bool _isHigh;
+        bool _isInput;
+        bool _pullUpEnabled;
+    public:
+        Pin(volatile uint8_t* port, volatile uint8_t* dport, uint8_t portNumber, uint8_t mode){
+            _port = port;
+            _dport = dport;
+            _portNumber = portNumber;
+            if(mode == INPUT){
+                _isInput = true;
+                *_dport &= ~(1<<_portNumber);
+            } else if (mode == OUTPUT){
+                _isInput = false;
+                *_dport |= (1<<_portNumber);
+            }
+            _isHigh = false;
+        }
+        void setHigh() {
+            _isHigh = true;
+            *_port |= (1<<_portNumber);
+        }
+        void setLow() {
+            _isHigh = false;
+            *_port &= ~(1<<_portNumber);
+        }
+        void enablePullUp(){
+            if(_isInput){
+                *_port |= (1<<_portNumber);
+            }
+        }
+        void disablePullUp(){
+            if(_isInput){
+                *_port &= ~(1<<_portNumber);
+            }
+        }
 };
 
 void turnOnAll(){
@@ -109,36 +155,44 @@ ISR(INT0_vect){
 }
 
 int main() {
-    uint8_t hour = 0;          // PORTD displays the hours
-    uint8_t minute = 0;         // PORTC displays the minutes
-    uint8_t second = 0;         // PORTB display the seconds
-    
-    enum Selected selected = HOUR;
-
-    initOutputs();
-    initINT0();
-    initInputPins();
-    showStartAnimation();
-
-    while(1) {
-        while(configMode){
-            turnOffAll();
-            switch(selected){
-                case HOUR:
-                    break;
-                case MINUTE:
-                    break;
-                case SECOND:
-                    break;
-            }
-        }
-
-        while(!configMode){
-            showTime(&hour, &minute, &second);
-            countSeconds(&second);
-            countMinutes(&minute, &second);
-            countHours(&hour, &minute, &second);
-            _delay_ms(1000);
-        }
+    Pin pin(&PORTD, &DDRD, 7, OUTPUT);
+    while(1){
+        pin.setHigh();
+        _delay_ms(1000);
+        pin.setLow();
+        _delay_ms(1000);
     }
+    
+    // uint8_t hour = 0;          // PORTD displays the hours
+    // uint8_t minute = 0;         // PORTC displays the minutes
+    // uint8_t second = 0;         // PORTB display the seconds
+    
+    // enum Selected selected = HOUR;
+
+    // initOutputs();
+    // initINT0();
+    // initInputPins();
+    // showStartAnimation();
+
+    // while(1) {
+    //     while(configMode){
+    //         turnOffAll();
+    //         switch(selected){
+    //             case HOUR:
+    //                 break;
+    //             case MINUTE:
+    //                 break;
+    //             case SECOND:
+    //                 break;
+    //         }
+    //     }
+
+    //     while(!configMode){
+    //         showTime(&hour, &minute, &second);
+    //         countSeconds(&second);
+    //         countMinutes(&minute, &second);
+    //         countHours(&hour, &minute, &second);
+    //         _delay_ms(1000);
+    //     }
+    // }
 }
