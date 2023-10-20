@@ -7,6 +7,7 @@
 #define ALL_OUTPUT 0xFF
 #define INPUT 0
 #define OUTPUT 1
+#define HIGH 1
 
 bool configMode = false;
 
@@ -55,6 +56,40 @@ class Pin {
         void disablePullUp(){
             if(_isInput){
                 *_port &= ~(1<<_portNumber);
+            }
+        }
+        volatile uint8_t* getPort(){
+            return _port;
+        }
+        uint8_t getPortNumber(){
+            return _portNumber;
+        }
+};
+
+class ShiftRegister {
+    private:
+        Pin* _data;
+        Pin* _clock;
+        Pin* _latch;
+    public:
+        ShiftRegister(Pin* data, Pin* clock, Pin* latch){
+            _data = data;
+            _clock = clock;
+            _latch = latch;
+        }
+        void sendByte(uint8_t* byte){
+            for(int i=0; i<8; i++){
+                if(*byte & (HIGH << i)){ // if Bit at Position i is 1    
+                    _data->setHigh();
+                } else {
+                    _data->setLow();
+                }
+                _clock->setHigh();
+                // no need to wait, a clock cycle is enough wait time
+                _clock->setLow();
+                _latch->setHigh();
+                // no need to wait, a clock cycle is enough wait time
+                _latch->setLow();
             }
         }
 };
@@ -155,11 +190,22 @@ ISR(INT0_vect){
 }
 
 int main() {
-    Pin pin(&PORTD, &DDRD, 7, OUTPUT);
+    uint8_t null = 0;
+    uint8_t byte = 0x55;
+    uint8_t byte2 = 0xAA;
+    
+    Pin data(&PORTB, &DDRB, 3, OUTPUT);
+    Pin clock(&PORTB, &DDRB, 5, OUTPUT);
+    Pin latch(&PORTB, &DDRB, 2, OUTPUT);
+
+    ShiftRegister shiftReg(&data, &clock, &latch);
+
     while(1){
-        pin.setHigh();
+        shiftReg.sendByte(&null);
         _delay_ms(1000);
-        pin.setLow();
+        shiftReg.sendByte(&byte);
+        _delay_ms(1000);
+        shiftReg.sendByte(&byte2);
         _delay_ms(1000);
     }
     
