@@ -10,6 +10,12 @@
 
 bool configMode = false;
 
+enum Time {
+    SECOND,
+    MINUTE,
+    HOUR
+};
+
 class Pin {
     private:
         volatile uint8_t* _port;
@@ -162,7 +168,7 @@ class Clock {
             _countMinutes();
             _countHours();
         }
-        void show(){
+        void showAll(){
             _spi->selectSlave(_secondSS);
             _spi->sendByte(&_second);
 
@@ -172,45 +178,47 @@ class Clock {
             _spi->selectSlave(_hourSS);
             _spi->sendByte(&_hour);
         }
+        void showSecond(){
+            _spi->selectSlave(_secondSS);
+            _spi->sendByte(&_second);
+        }
+        void showMinute(){
+            _spi->selectSlave(_minuteSS);
+            _spi->sendByte(&_minute);
+        }
+        void showHour(){
+            _spi->selectSlave(_hourSS);
+            _spi->sendByte(&_hour);
+        }
+        void setTime(uint8_t hour, uint8_t minute, uint8_t second){
+            _hour = hour;
+            _minute = minute;
+            _second = second;
+        }
+        void turnAllOff(){
+            uint8_t null = 0x00;
+            _spi->selectSlave(_secondSS);
+            _spi->sendByte(&null);
+
+            _spi->selectSlave(_minuteSS);
+            _spi->sendByte(&null);
+
+            _spi->selectSlave(_hourSS);
+            _spi->sendByte(&null);
+        }
 };
 
-// void showStartAnimation(){
-//     turnOnAll();
-//     _delay_ms(200);
-//     turnOffAll();
-//     _delay_ms(200);
-//     turnOnAll();
-//     _delay_ms(200);
-//     turnOffAll();
-//     for(uint8_t i=0; i<=5; i++){
-//         PORTB ^= (1 << i);
-//         _delay_ms(100);
-//         PORTB ^= (1 << i);
-//     }
-//     for(uint8_t i=0; i<=5; i++){
-//         PORTC ^= (1 << i);
-//         _delay_ms(100);
-//         PORTC ^= (1 << i);
-//     }
-//     for(uint8_t i=0; i<=4; i++){
-//         PORTD ^= (1 << i+3);        // +3 because LED0 is not at PD0, but at PD3
-//         _delay_ms(100);
-//         PORTD ^= (1 << i+3);
-//     }
-    
-// }
-
 void initINT0() {
-    EICRA = 3;                  // rising edge of INT0 generates an interrupt request
-    EIMSK = 1;                  // INT0: External Interrupt Request 0 Enable
-    SREG = 128;                 // enable interrupts globally
-    _delay_ms(200);
+    EICRA |= (1 << ISC01) | (1 << ISC00);   // rising edge of INT0 generates an interrupt request PD2 (Pin 2)
+    EIMSK |= (1 << INT0);                   // INT0: External Interrupt Request 0 Enable
+    sei();                                  // enable interrupts globally
 }
 
 ISR(INT0_vect){
-    //turnOffAll();
     configMode = !configMode;
 }
+
+enum Time userChoice = HOUR;
 
 int main() {
     Pin secondSS(&PORTB, &DDRB, 2, OUTPUT);
@@ -223,10 +231,30 @@ int main() {
     SoftSPI spi(&secondSS);
 
     Clock clock(&spi, &secondSS, &minuteSS, &hourSS);
+    clock.setTime(3, 32, 58);
+    
+    initINT0();                             // enable INT0
 
     while(1){
-        clock.show();
-        clock.tick();
-        _delay_ms(1000);
+        if(!configMode){
+            clock.showAll();
+            clock.tick();
+            _delay_ms(1000);
+        } else {
+            clock.turnAllOff();
+            switch(userChoice){
+                case HOUR:
+                    clock.showHour();
+                    break;
+                case MINUTE:
+                    clock.showMinute();
+                    break;
+                case SECOND:
+                    clock.showSecond();
+                    break;
+            }
+            _delay_ms(100);
+        }
+        
     }
 }
