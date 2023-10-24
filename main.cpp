@@ -66,31 +66,19 @@ class Pin {
         }
 };
 
-class ShiftRegister {
-    private:
-        Pin* _data;
-        Pin* _clock;
-        Pin* _latch;
+class SPI {        
     public:
-        ShiftRegister(Pin* data, Pin* clock, Pin* latch){
-            _data = data;
-            _clock = clock;
-            _latch = latch;
+        SPI(){
+            /* SPI Master Init */
+            // Enable SPI, Master, set clock rate fck/16
+            SPCR |= (1<<SPE)|(1<<MSTR)|(1<<SPR0);
+            DDRB |= (1 << PORT2) | (1 << PORT3) | (1 << PORT5);
         }
         void sendByte(uint8_t* byte){
-            for(int i=0; i<8; i++){
-                if(*byte & (HIGH << i)){ // if Bit at Position i is 1    
-                    _data->setHigh();
-                } else {
-                    _data->setLow();
-                }
-                _clock->setHigh();
-                // no need to wait, a clock cycle is enough wait time
-                _clock->setLow();
-                _latch->setHigh();
-                // no need to wait, a clock cycle is enough wait time
-                _latch->setLow();
-            }
+            SPDR = *byte;               // start transmission
+            PORTB |= (1 << PORT2); 
+            while(!(SPSR & (1<<SPIF))); // wait for transmission complete
+            PORTB &= ~(1 << PORT2);
         }
 };
 
@@ -190,26 +178,28 @@ ISR(INT0_vect){
 }
 
 int main() {
+    
     uint8_t null = 0;
+    uint8_t full = 0xFF;
     uint8_t byte = 0x55;
     uint8_t byte2 = 0xAA;
-    
-    Pin data(&PORTB, &DDRB, 3, OUTPUT);
-    Pin clock(&PORTB, &DDRB, 5, OUTPUT);
-    Pin latch(&PORTB, &DDRB, 2, OUTPUT);
 
-    ShiftRegister shiftReg(&data, &clock, &latch);
-
+    SPI spi;
     while(1){
-        shiftReg.sendByte(&null);
+
+        spi.sendByte(&full);
         _delay_ms(1000);
-        shiftReg.sendByte(&byte);
+        spi.sendByte(&null);
         _delay_ms(1000);
-        shiftReg.sendByte(&byte2);
+        spi.sendByte(&byte);
         _delay_ms(1000);
+        spi.sendByte(&byte2);
+        _delay_ms(1000);
+        
     }
-    
-    // uint8_t hour = 0;          // PORTD displays the hours
+
+
+    // uint8_t hour = 0;           // PORTD displays the hours
     // uint8_t minute = 0;         // PORTC displays the minutes
     // uint8_t second = 0;         // PORTB display the seconds
     

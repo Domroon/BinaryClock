@@ -4,3 +4,6 @@ main.hex
 shiftregister.cpp
 shiftregister.elf
 shiftregister.hex
+spi.cpp
+spi.elf
+spi.hex
