@@ -82,6 +82,34 @@ class SPI {
         }
 };
 
+class SoftSPI {
+    // SPI without SPI Hardware, fully imlplemented in Software
+    // CPU has more to do than in Hardware SPI
+    public:
+        SoftSPI(){
+            // PORTD2 SS
+            // PORTD3 MOSI
+            // PORTD5 SCK
+            DDRB |= (1 << PORT2) | (1 << PORT3) | (1 << PORT5);
+            PORTB |= (1<<2);                // LATCH HIGH
+        }
+        void sendByte(uint8_t* byte){
+            PORTB &= ~(1<<2);               // LATCH LOW
+            for(int i=0; i<8; i++){
+                if(*byte & (HIGH << i)){    // if Bit at Position i is 1    
+                    PORTB |= (1<<3);        // DATA HIGH
+                } else {
+                    PORTB &= ~(1<<3);       // DATA LOW
+                }
+
+                PORTB |= (1<<5);            // CLOCK HIGH
+                // no need to wait, a clock cycle is enough wait time
+                PORTB &= ~(1<<5);           // CLOCK LOW
+            }
+            PORTB |= (1<<2);                // LATCH HIGH
+        }
+};
+
 void turnOnAll(){
     PORTB = 0xFF;
     PORTC = 0xFF;
@@ -184,18 +212,26 @@ int main() {
     uint8_t byte = 0x55;
     uint8_t byte2 = 0xAA;
 
-    SPI spi;
-    while(1){
+    SoftSPI spi;
 
-        spi.sendByte(&full);
+    uint8_t counter = 0;
+
+    while(1){
+        spi.sendByte(&counter);
+        if(counter >= 16){
+            counter = 0;
+        } else {
+            counter += 1;
+        }
         _delay_ms(1000);
-        spi.sendByte(&null);
-        _delay_ms(1000);
-        spi.sendByte(&byte);
-        _delay_ms(1000);
-        spi.sendByte(&byte2);
-        _delay_ms(1000);
-        
+        // spi.sendByte(&full);
+        // _delay_ms(1000);
+        // spi.sendByte(&null);
+        // _delay_ms(1000);
+        // spi.sendByte(&byte);
+        // _delay_ms(1000);
+        // spi.sendByte(&byte2);
+        // _delay_ms(1000);
     }
 
 
