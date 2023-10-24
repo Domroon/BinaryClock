@@ -4,19 +4,11 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 
-#define ALL_OUTPUT 0xFF
 #define INPUT 0
 #define OUTPUT 1
 #define HIGH 1
 
 bool configMode = false;
-
-enum Selected {
-    HOUR,
-    MINUTE,
-    SECOND
-};
-
 
 class Pin {
     private:
@@ -85,16 +77,20 @@ class SPI {
 class SoftSPI {
     // SPI without SPI Hardware, fully imlplemented in Software
     // CPU has more to do than in Hardware SPI
+    private:
+        Pin* _ss;
     public:
-        SoftSPI(){
-            // PORTD2 SS
+        SoftSPI(Pin* ss){
+            _ss = ss;
             // PORTD3 MOSI
             // PORTD5 SCK
             DDRB |= (1 << PORT2) | (1 << PORT3) | (1 << PORT5);
-            PORTB |= (1<<2);                // LATCH HIGH
+            // PORTB |= (1<<2);                // LATCH HIGH
+            _ss->setHigh();                 // Slave Select HIGH
         }
         void sendByte(uint8_t* byte){
-            PORTB &= ~(1<<2);               // LATCH LOW
+            // PORTB &= ~(1<<2);               // LATCH LOW
+            _ss->setLow();                  // Slave Select LOW
             for(int i=0; i<8; i++){
                 if(*byte & (HIGH << i)){    // if Bit at Position i is 1    
                     PORTB |= (1<<3);        // DATA HIGH
@@ -106,87 +102,103 @@ class SoftSPI {
                 // no need to wait, a clock cycle is enough wait time
                 PORTB &= ~(1<<5);           // CLOCK LOW
             }
-            PORTB |= (1<<2);                // LATCH HIGH
+            // PORTB |= (1<<2);                // LATCH HIGH
+            _ss->setHigh();                 // Slave Select HIGH
+        }
+        void selectSlave(Pin* ss){
+            _ss = ss;
         }
 };
 
-void turnOnAll(){
-    PORTB = 0xFF;
-    PORTC = 0xFF;
-    PORTD = 0xFF;
-}
+class Clock {
+    private:
+        SoftSPI* _spi;
+        Pin* _secondSS;
+        Pin* _minuteSS;
+        Pin* _hourSS;
 
-void turnOffAll(){
-    PORTB = 0x00;
-    PORTC = 0x00;
-    PORTD = 0x00;
-}
+        uint8_t _hour;
+        uint8_t _minute;
+        uint8_t _second;
+        
+        void _countSeconds(){
+            if(_second < 59){
+                _second += 1;
+            } else {
+                _second = 0;
+            }
+        }
+        void _countMinutes(){
+            if(_second == 0){
+                if(_minute < 59){
+                    _minute += 1;
+                } else {
+                    _minute = 0;
+                }
+            }
+        }
+        void _countHours(){
+            if(_minute == 0 && _second == 0){
+                if(_hour < 23){
+                    _hour += 1;
+                } else {
+                    _hour = 0;
+                }
+            }
+        }   
+    public:
+        Clock(SoftSPI* spi, Pin* secondSS, Pin* minuteSS, Pin* hourSS){
+            _spi = spi;
+            _secondSS = secondSS;
+            _minuteSS = minuteSS;
+            _hourSS = hourSS;
 
-void showStartAnimation(){
-    turnOnAll();
-    _delay_ms(200);
-    turnOffAll();
-    _delay_ms(200);
-    turnOnAll();
-    _delay_ms(200);
-    turnOffAll();
-    for(uint8_t i=0; i<=5; i++){
-        PORTB ^= (1 << i);
-        _delay_ms(100);
-        PORTB ^= (1 << i);
-    }
-    for(uint8_t i=0; i<=5; i++){
-        PORTC ^= (1 << i);
-        _delay_ms(100);
-        PORTC ^= (1 << i);
-    }
-    for(uint8_t i=0; i<=4; i++){
-        PORTD ^= (1 << i+3);        // +3 because LED0 is not at PD0, but at PD3
-        _delay_ms(100);
-        PORTD ^= (1 << i+3);
-    }
+            _hour = 0;
+            _minute = 0;
+            _second = 0;
+        }
+        void tick(){
+            _countSeconds();
+            _countMinutes();
+            _countHours();
+        }
+        void show(){
+            _spi->selectSlave(_secondSS);
+            _spi->sendByte(&_second);
+
+            _spi->selectSlave(_minuteSS);
+            _spi->sendByte(&_minute);
+
+            _spi->selectSlave(_hourSS);
+            _spi->sendByte(&_hour);
+        }
+};
+
+// void showStartAnimation(){
+//     turnOnAll();
+//     _delay_ms(200);
+//     turnOffAll();
+//     _delay_ms(200);
+//     turnOnAll();
+//     _delay_ms(200);
+//     turnOffAll();
+//     for(uint8_t i=0; i<=5; i++){
+//         PORTB ^= (1 << i);
+//         _delay_ms(100);
+//         PORTB ^= (1 << i);
+//     }
+//     for(uint8_t i=0; i<=5; i++){
+//         PORTC ^= (1 << i);
+//         _delay_ms(100);
+//         PORTC ^= (1 << i);
+//     }
+//     for(uint8_t i=0; i<=4; i++){
+//         PORTD ^= (1 << i+3);        // +3 because LED0 is not at PD0, but at PD3
+//         _delay_ms(100);
+//         PORTD ^= (1 << i+3);
+//     }
     
-}
-
-void showTime(uint8_t* hour, uint8_t* minute, uint8_t* second){
-    PORTB = *second;
-    PORTC = *minute;
-    PORTD = (*hour << 3);
-}
-
-void countSeconds(uint8_t* second){
-    if(*second < 59){
-        *second = *second + 1;
-    } else {
-        *second = 0;
-    }
-}
-
-void countMinutes(uint8_t* minute, uint8_t* second){
-    if(*second == 0){
-        if(*minute < 59){
-            *minute = *minute + 1;
-        } else {
-            *minute = 0;
-        }
-    }
-}
-
-void countHours(uint8_t* hour, uint8_t* minute, uint8_t* second){
-    if(*minute == 0 && *second == 0){
-        if(*hour < 23){
-            *hour = *hour + 1;
-        } else {
-            *hour = 0;
-        }
-    }
-}
-
-void initOutputs(){
-    DDRB = ALL_OUTPUT;          // set whole PORTB as output
-    DDRC = ALL_OUTPUT;          // set whole PORTC as output
-    DDRD = ALL_OUTPUT;          // set whole PORTD as output
-}
+// }
 
 void initINT0() {
     EICRA = 3;                  // rising edge of INT0 generates an interrupt request
@@ -195,76 +207,26 @@ void initINT0() {
     _delay_ms(200);
 }
 
-void initInputPins() {
-    DDRD &= ~(1<<0);            // set PD0 as Input
-    DDRD &= ~(1<<1);            // set PD1 as Input
-}
-
 ISR(INT0_vect){
     //turnOffAll();
     configMode = !configMode;
 }
 
 int main() {
-    
-    uint8_t null = 0;
-    uint8_t full = 0xFF;
-    uint8_t byte = 0x55;
-    uint8_t byte2 = 0xAA;
+    Pin secondSS(&PORTB, &DDRB, 2, OUTPUT);
+    secondSS.setHigh();
+    Pin minuteSS(&PORTB, &DDRB, 1, OUTPUT);
+    minuteSS.setHigh();
+    Pin hourSS(&PORTB, &DDRB, 0, OUTPUT);
+    hourSS.setHigh();
 
-    SoftSPI spi;
+    SoftSPI spi(&secondSS);
 
-    uint8_t counter = 0;
+    Clock clock(&spi, &secondSS, &minuteSS, &hourSS);
 
     while(1){
-        spi.sendByte(&counter);
-        if(counter >= 16){
-            counter = 0;
-        } else {
-            counter += 1;
-        }
+        clock.show();
+        clock.tick();
         _delay_ms(1000);
-        // spi.sendByte(&full);
-        // _delay_ms(1000);
-        // spi.sendByte(&null);
-        // _delay_ms(1000);
-        // spi.sendByte(&byte);
-        // _delay_ms(1000);
-        // spi.sendByte(&byte2);
-        // _delay_ms(1000);
     }
-
-
-    // uint8_t hour = 0;           // PORTD displays the hours
-    // uint8_t minute = 0;         // PORTC displays the minutes
-    // uint8_t second = 0;         // PORTB display the seconds
-    
-    // enum Selected selected = HOUR;
-
-    // initOutputs();
-    // initINT0();
-    // initInputPins();
-    // showStartAnimation();
-
-    // while(1) {
-    //     while(configMode){
-    //         turnOffAll();
-    //         switch(selected){
-    //             case HOUR:
-    //                 break;
-    //             case MINUTE:
-    //                 break;
-    //             case SECOND:
-    //                 break;
-    //         }
-    //     }
-
-    //     while(!configMode){
-    //         showTime(&hour, &minute, &second);
-    //         countSeconds(&second);
-    //         countMinutes(&minute, &second);
-    //         countHours(&hour, &minute, &second);
-    //         _delay_ms(1000);
-    //     }
-    // }
 }
