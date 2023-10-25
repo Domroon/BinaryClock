@@ -7,3 +7,6 @@ shiftregister.hex
 spi.cpp
 spi.elf
 spi.hex
+input.cpp
+input.hex
+input.elf

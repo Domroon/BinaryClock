@@ -20,6 +20,7 @@ class Pin {
     private:
         volatile uint8_t* _port;
         volatile uint8_t* _dport;
+        volatile uint8_t* _pinx;
         uint8_t _portNumber;
         bool _isHigh;
         bool _isInput;
@@ -37,6 +38,13 @@ class Pin {
                 *_dport |= (1<<_portNumber);
             }
             _isHigh = false;
+            if(_port == &PORTB){
+                _pinx = &PINB;
+            } else if(_port == &PORTC) {
+                _pinx = &PINC;
+            } else if(_port == &PORTD){
+                _pinx = &PIND;
+            }
         }
         void setHigh() {
             _isHigh = true;
@@ -61,6 +69,13 @@ class Pin {
         }
         uint8_t getPortNumber(){
             return _portNumber;
+        }
+        bool isHigh(){
+            if(*_pinx & (1 << _portNumber)){
+                return true;
+            } else {
+                return false;
+            }
         }
 };
 
@@ -126,32 +141,6 @@ class Clock {
         uint8_t _hour;
         uint8_t _minute;
         uint8_t _second;
-        
-        void _countSeconds(){
-            if(_second < 59){
-                _second += 1;
-            } else {
-                _second = 0;
-            }
-        }
-        void _countMinutes(){
-            if(_second == 0){
-                if(_minute < 59){
-                    _minute += 1;
-                } else {
-                    _minute = 0;
-                }
-            }
-        }
-        void _countHours(){
-            if(_minute == 0 && _second == 0){
-                if(_hour < 23){
-                    _hour += 1;
-                } else {
-                    _hour = 0;
-                }
-            }
-        }   
     public:
         Clock(SoftSPI* spi, Pin* secondSS, Pin* minuteSS, Pin* hourSS){
             _spi = spi;
@@ -163,10 +152,35 @@ class Clock {
             _minute = 0;
             _second = 0;
         }
+        void countSeconds(){
+            if(_second < 59){
+                _second += 1;
+            } else {
+                _second = 0;
+            }
+        }
+        void countMinutes(){
+                if(_minute < 59){
+                    _minute += 1;
+                } else {
+                    _minute = 0;
+                }
+        }
+        void countHours(){
+                if(_hour < 23){
+                    _hour += 1;
+                } else {
+                    _hour = 0;
+                }
+        }   
         void tick(){
-            _countSeconds();
-            _countMinutes();
-            _countHours();
+            countSeconds();
+            if(_second == 0){
+                countMinutes();
+            }
+            if(_minute == 0 && _second == 0){
+                countHours();
+            }
         }
         void showAll(){
             _spi->selectSlave(_secondSS);
@@ -195,6 +209,18 @@ class Clock {
             _minute = minute;
             _second = second;
         }
+        void setHour(uint8_t hour){
+            _hour = hour;
+        }
+        void addHour(){
+
+        }
+        void setMinute(uint8_t minute){
+            _minute = minute;
+        }
+        void setSecond(uint8_t second){
+            _second = second;
+        }
         void turnAllOff(){
             uint8_t null = 0x00;
             _spi->selectSlave(_secondSS);
@@ -218,8 +244,6 @@ ISR(INT0_vect){
     configMode = !configMode;
 }
 
-enum Time userChoice = HOUR;
-
 int main() {
     Pin secondSS(&PORTB, &DDRB, 2, OUTPUT);
     secondSS.setHigh();
@@ -228,12 +252,19 @@ int main() {
     Pin hourSS(&PORTB, &DDRB, 0, OUTPUT);
     hourSS.setHigh();
 
+    Pin selectBtn(&PORTD, &DDRD, 7, INPUT);
+    selectBtn.enablePullUp();
+
+    Pin countBtn(&PORTD, &DDRD, 6, INPUT);
+    countBtn.enablePullUp();
+
     SoftSPI spi(&secondSS);
 
     Clock clock(&spi, &secondSS, &minuteSS, &hourSS);
-    clock.setTime(3, 32, 58);
     
     initINT0();                             // enable INT0
+
+    enum Time userChoice = HOUR;
 
     while(1){
         if(!configMode){
@@ -253,6 +284,30 @@ int main() {
                     clock.showSecond();
                     break;
             }
+            if(!selectBtn.isHigh()){
+                if(userChoice == HOUR){
+                    userChoice = MINUTE;
+                } else if(userChoice == MINUTE){
+                    userChoice = SECOND;
+                } else if(userChoice == SECOND){
+                    userChoice = HOUR;
+                }
+                _delay_ms(100);
+            }
+            if(!countBtn.isHigh()){
+                if(userChoice == HOUR){
+                    clock.countHours();
+                    clock.showHour();
+                } else if(userChoice == MINUTE){
+                    clock.countMinutes();
+                    clock.showMinute();
+                } else if(userChoice == SECOND){
+                    clock.countSeconds();
+                    clock.showSecond();
+                }
+                _delay_ms(100);
+            }
+
             _delay_ms(100);
         }
         
