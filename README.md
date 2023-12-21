@@ -1,7 +1,7 @@
 # Binary Clock
 
 A binary Clock that can used as a normal watch. The "INT0BTN"-Button can be used to stop the clock and change into config mode.
-In condig mode you can select between "hour", "minute" and "second" - Leds. During a selection you can count up to setup the clock.
+In config mode you can select between "hour", "minute" and "second" - Leds. During a selection you can count up to setup the clock.
 
 ## avr-libc
 
@@ -16,7 +16,7 @@ https://www.nongnu.org/avr-libc/user-manual/modules.html
 
     avrdude -c arduino -p m328p -U flash:w:"main.hex":a -P /dev/ttyACM0
 
-## Helpfull Links
+## Helpful Links
 
     https://www.rapidtables.com/calc/math/binary-calculator.html
 
